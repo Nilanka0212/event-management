@@ -1,0 +1,8 @@
+@extends('layouts.app')
+@section('title', 'Customer credit report')
+@section('page-title', 'Customer credit report')
+@section('content')
+<div class="page-header"><div><h4>Customer credit report</h4><p class="text-muted mb-0">Billed, paid, and outstanding balances by customer.</p></div></div>
+<form method="GET" class="card card-body mb-3"><div class="row g-2"><div class="col-sm-6"><label class="form-label" for="search">Customer</label><input id="search" class="form-control" name="search" value="{{ $search }}" placeholder="Search by name"></div><div class="col-auto align-self-end"><button class="btn btn-primary"><i class="bi bi-search me-1"></i> Search</button></div></div></form>
+<div class="card"><div class="table-responsive"><table class="table mb-0"><thead><tr><th>Customer</th><th class="text-end">Billed</th><th class="text-end">Paid</th><th class="text-end">Balance</th><th>Status</th></tr></thead><tbody>@forelse($customers as $row)<tr><td><a href="{{ route('customers.show', $row['customer']) }}">{{ $row['customer']->name }}</a></td><td class="text-end">{{ number_format($row['total_billed'], 2) }}</td><td class="text-end">{{ number_format($row['total_paid'], 2) }}</td><td class="text-end fw-semibold">{{ number_format($row['balance'], 2) }}</td><td><span class="badge-status badge-{{ $row['status'] === 'cleared' ? 'paid' : 'partial' }}">{{ ucfirst($row['status']) }}</span></td></tr>@empty<tr><td colspan="5" class="text-center text-muted py-4">No customer balances found.</td></tr>@endforelse</tbody></table></div></div>
+@endsection

@@ -1,0 +1,9 @@
+@extends('layouts.app')
+@section('title', 'Monthly profit and loss')
+@section('page-title', 'Monthly profit and loss')
+@section('content')
+<div class="page-header"><div><h4>Monthly profit and loss</h4><p class="text-muted mb-0">Payments received compared with recorded expenses.</p></div></div>
+<form method="GET" class="card card-body mb-3"><div class="row g-3 align-items-end"><div class="col-sm-3"><label class="form-label">Year</label><input class="form-control" type="number" name="year" value="{{ $year }}" min="2000" max="2100"></div><div class="col-auto"><button class="btn btn-primary">Apply</button></div></div></form>
+<div class="row g-3 mb-3"><div class="col-md-4"><div class="stat-card"><div><p class="stat-label">Revenue</p><p class="stat-value">{{ number_format($totalRevenue, 2) }}</p></div></div></div><div class="col-md-4"><div class="stat-card"><div><p class="stat-label">Expenses</p><p class="stat-value">{{ number_format($totalExpenses, 2) }}</p></div></div></div><div class="col-md-4"><div class="stat-card"><div><p class="stat-label">Profit</p><p class="stat-value">{{ number_format($totalProfit, 2) }}</p></div></div></div></div>
+<div class="card"><div class="table-responsive"><table class="table mb-0"><thead><tr><th>Month</th><th class="text-end">Revenue</th><th class="text-end">Expenses</th><th class="text-end">Profit</th></tr></thead><tbody>@foreach($months as $month)<tr><td>{{ $month['month'] }}</td><td class="text-end">{{ number_format($month['revenue'], 2) }}</td><td class="text-end">{{ number_format($month['expenses'], 2) }}</td><td class="text-end">{{ number_format($month['profit'], 2) }}</td></tr>@endforeach</tbody></table></div></div>
+@endsection
