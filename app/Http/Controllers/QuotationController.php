@@ -15,10 +15,76 @@ use Illuminate\Support\Facades\DB;
 
 class QuotationController extends Controller
 {
-    public function index()
+    public function index(Request $request)
     {
-        $quotations = Quotation::with('customer')->latest()->paginate(15);
-        return view('quotations.index', compact('quotations'));
+        $search = $request->input('search');
+        $customerId = $request->input('customer_id');
+        $subCategoryId = $request->input('sub_category_id');
+        $status = $request->input('status');
+        $fromDate = $request->input('from_date');
+        $toDate = $request->input('to_date');
+
+        $query = Quotation::with(['customer', 'subCategory.category']);
+
+        if ($search) {
+            $query->where(function ($q) use ($search) {
+                $q->where('quotation_no', 'like', "%{$search}%")
+                  ->orWhere('event_name', 'like', "%{$search}%")
+                  ->orWhere('venue', 'like', "%{$search}%")
+                  ->orWhereHas('customer', function ($q2) use ($search) {
+                      $q2->where('name', 'like', "%{$search}%")
+                         ->orWhere('phone', 'like', "%{$search}%")
+                         ->orWhere('email', 'like', "%{$search}%");
+                  });
+            });
+        }
+
+        if ($customerId) {
+            $query->where('customer_id', $customerId);
+        }
+
+        if ($subCategoryId) {
+            $query->where('event_sub_category_id', $subCategoryId);
+        }
+
+        if ($status) {
+            $query->where('status', $status);
+        }
+
+        if ($fromDate) {
+            $query->whereDate('quotation_date', '>=', $fromDate);
+        }
+
+        if ($toDate) {
+            $query->whereDate('quotation_date', '<=', $toDate);
+        }
+
+        $quotations = $query->latest('quotation_date')
+            ->latest('id')
+            ->paginate(25)
+            ->withQueryString();
+
+        $customers = Customer::where('is_active', true)->orderBy('name')->get();
+        $subCategories = EventSubCategory::with('category')->where('is_active', true)->orderBy('name')->get();
+
+        $totalQuotationsCount = Quotation::count();
+        $draftCount = Quotation::where('status', 'draft')->count();
+        $sentCount = Quotation::where('status', 'sent')->count();
+        $acceptedCount = Quotation::where('status', 'accepted')->count();
+        $rejectedCount = Quotation::where('status', 'rejected')->count();
+        $totalQuotedValue = Quotation::sum('total_amount');
+
+        return view('quotations.index', compact(
+            'quotations',
+            'customers',
+            'subCategories',
+            'totalQuotationsCount',
+            'draftCount',
+            'sentCount',
+            'acceptedCount',
+            'rejectedCount',
+            'totalQuotedValue'
+        ));
     }
 
     public function create()
@@ -101,7 +167,7 @@ class QuotationController extends Controller
         $customers = Customer::where('is_active', true)->orderBy('name')->get();
         $categories = EventCategory::where('is_active', true)->get();
         $services = Service::where('is_active', true)->get();
-        $quotation->load(['services', 'otherCharges']);
+        $quotation->load(['customer', 'subCategory.category', 'subCategory.subCategoryServices.service', 'services.service', 'otherCharges']);
         return view('quotations.edit', compact('quotation', 'customers', 'categories', 'services'));
     }
 
@@ -109,8 +175,12 @@ class QuotationController extends Controller
     {
         $validated = $request->validate([
             'customer_id' => 'required|exists:customers,id',
+            'event_sub_category_id' => 'nullable|exists:event_sub_categories,id',
             'quotation_date' => 'required|date',
             'valid_until' => 'nullable|date',
+            'event_name' => 'nullable|string|max:255',
+            'event_date' => 'nullable|date',
+            'venue' => 'nullable|string|max:255',
             'discount' => 'nullable|numeric|min:0',
             'status' => 'required|in:draft,sent,accepted,rejected',
             'remarks' => 'nullable|string',

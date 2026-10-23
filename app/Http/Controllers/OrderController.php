@@ -14,19 +14,71 @@ use Illuminate\Support\Facades\DB;
 
 class OrderController extends Controller
 {
-    public function index()
+    public function index(Request $request)
     {
-        $search = request('search');
-        $status = request('status');
+        $search = $request->input('search');
+        $customerId = $request->input('customer_id');
+        $eventId = $request->input('event_id');
+        $paymentStatus = $request->input('payment_status', $request->input('status'));
+        $fromDate = $request->input('from_date');
+        $toDate = $request->input('to_date');
 
-        $orders = Order::with(['customer', 'event'])
-            ->when($search, fn($q) => $q->where('order_no', 'like', "%$search%")
-                ->orWhereHas('customer', fn($q2) => $q2->where('name', 'like', "%$search%")))
-            ->when($status, fn($q) => $q->where('payment_status', $status))
-            ->latest()
-            ->paginate(15);
+        $query = Order::with(['customer', 'event']);
 
-        return view('orders.index', compact('orders'));
+        if ($search) {
+            $query->where(function ($q) use ($search) {
+                $q->where('order_no', 'like', "%{$search}%")
+                  ->orWhereHas('customer', function ($q2) use ($search) {
+                      $q2->where('name', 'like', "%{$search}%")
+                         ->orWhere('phone', 'like', "%{$search}%");
+                  })
+                  ->orWhereHas('event', function ($q3) use ($search) {
+                      $q3->where('event_name', 'like', "%{$search}%")
+                         ->orWhere('event_no', 'like', "%{$search}%");
+                  });
+            });
+        }
+
+        if ($customerId) {
+            $query->where('customer_id', $customerId);
+        }
+
+        if ($eventId) {
+            $query->where('event_id', $eventId);
+        }
+
+        if ($paymentStatus) {
+            $query->where('payment_status', $paymentStatus);
+        }
+
+        if ($fromDate) {
+            $query->whereDate('order_date', '>=', $fromDate);
+        }
+
+        if ($toDate) {
+            $query->whereDate('order_date', '<=', $toDate);
+        }
+
+        $orders = $query->latest('order_date')
+            ->latest('id')
+            ->paginate(25)
+            ->withQueryString();
+
+        $customers = Customer::where('is_active', true)->orderBy('name')->get();
+        $events = Event::orderBy('event_name')->get(['id', 'event_no', 'event_name']);
+
+        $totalOrdersCount = Order::count();
+        $paidOrdersCount = Order::where('payment_status', 'paid')->count();
+        $partialOrdersCount = Order::where('payment_status', 'partial')->count();
+        $pendingOrdersCount = Order::where('payment_status', 'pending')->count();
+        $totalRevenue = Order::sum('total_amount');
+        $totalBalance = Order::sum('balance');
+
+        return view('orders.index', compact(
+            'orders', 'customers', 'events',
+            'totalOrdersCount', 'paidOrdersCount', 'partialOrdersCount', 'pendingOrdersCount',
+            'totalRevenue', 'totalBalance'
+        ));
     }
 
     public function create(Request $request)
@@ -112,14 +164,18 @@ class OrderController extends Controller
 
     public function edit(Order $order)
     {
+        $customers = Customer::where('is_active', true)->orderBy('name')->get();
+        $events = Event::with('customer')->orderBy('event_date')->get();
         $services = Service::where('is_active', true)->get();
-        $order->load(['services', 'otherCharges', 'event']);
-        return view('orders.edit', compact('order', 'services'));
+        $order->load(['customer', 'services.service', 'otherCharges', 'event.subCategory']);
+        return view('orders.edit', compact('order', 'services', 'customers', 'events'));
     }
 
     public function update(Request $request, Order $order)
     {
         $validated = $request->validate([
+            'customer_id' => 'nullable|exists:customers,id',
+            'event_id' => 'nullable|exists:events,id',
             'order_date' => 'required|date',
             'discount' => 'nullable|numeric|min:0',
             'notes' => 'nullable|string',
@@ -175,5 +231,38 @@ class OrderController extends Controller
     {
         $orders = Order::with('payments')->where('event_id', $eventId)->get();
         return response()->json($orders);
+    }
+
+    public function apiGetEventDetails($eventId)
+    {
+        $event = Event::with(['customer', 'subCategory.subCategoryServices.service', 'additionalServices.service', 'otherCharges'])
+            ->findOrFail($eventId);
+
+        return response()->json([
+            'id' => $event->id,
+            'event_name' => $event->event_name,
+            'customer_id' => $event->customer_id,
+            'customer_name' => $event->customer?->name,
+            'package_name' => $event->subCategory?->name,
+            'package_sell_price' => $event->package_sell_price,
+            'discount' => $event->discount,
+            'advance_payment' => $event->advance_payment,
+            'package_services' => $event->subCategory?->subCategoryServices->map(fn($s) => [
+                'service_id' => $s->service_id,
+                'description' => $s->service?->name . ' (Package: ' . $event->subCategory?->name . ')',
+                'qty' => $s->qty,
+                'unit_price' => $s->cost_price,
+            ]) ?? [],
+            'additional_services' => $event->additionalServices->map(fn($s) => [
+                'service_id' => $s->service_id,
+                'description' => $s->description,
+                'qty' => $s->qty,
+                'unit_price' => $s->unit_price,
+            ]),
+            'other_charges' => $event->otherCharges->map(fn($c) => [
+                'description' => $c->description,
+                'amount' => $c->amount,
+            ]),
+        ]);
     }
 }

@@ -9,7 +9,7 @@ class ServiceController extends Controller
 {
     public function index()
     {
-        $services = Service::latest()->paginate(15);
+        $services = Service::latest()->paginate(25)->withQueryString();
         return view('services.index', compact('services'));
     }
 

@@ -9,7 +9,8 @@ class Expense extends Model
 {
     protected $fillable = [
         'expense_no', 'type', 'category', 'description',
-        'amount', 'expense_date', 'event_id', 'reference', 'notes'
+        'amount', 'payment_method', 'bank_name', 'cheque_no',
+        'expense_date', 'event_id', 'order_id', 'reference', 'notes'
     ];
 
     protected $casts = [
@@ -32,5 +33,10 @@ class Expense extends Model
     public function event(): BelongsTo
     {
         return $this->belongsTo(Event::class);
+    }
+
+    public function order(): BelongsTo
+    {
+        return $this->belongsTo(Order::class);
     }
 }

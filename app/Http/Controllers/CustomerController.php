@@ -7,14 +7,51 @@ use Illuminate\Http\Request;
 
 class CustomerController extends Controller
 {
-    public function index()
+    public function index(Request $request)
     {
-        $search = request('search');
-        $customers = Customer::when($search, fn($q) => $q->where('name', 'like', "%$search%")
-            ->orWhere('phone', 'like', "%$search%")
-            ->orWhere('email', 'like', "%$search%"))
-            ->latest()
-            ->paginate(15);
+        $search = $request->input('search');
+        $status = $request->input('status');
+        $hasEvents = $request->input('has_events');
+        $fromDate = $request->input('from_date');
+        $toDate = $request->input('to_date');
+
+        $query = Customer::withCount(['events', 'orders']);
+
+        if ($search) {
+            $query->where(function ($q) use ($search) {
+                $q->where('name', 'like', "%{$search}%")
+                  ->orWhere('company_name', 'like', "%{$search}%")
+                  ->orWhere('phone', 'like', "%{$search}%")
+                  ->orWhere('phone2', 'like', "%{$search}%")
+                  ->orWhere('email', 'like', "%{$search}%")
+                  ->orWhere('nic', 'like', "%{$search}%")
+                  ->orWhere('city', 'like', "%{$search}%")
+                  ->orWhere('address', 'like', "%{$search}%");
+            });
+        }
+
+        if ($status !== null && $status !== '') {
+            $query->where('is_active', $status === '1' || $status === 'active');
+        }
+
+        if ($hasEvents === 'yes') {
+            $query->has('events');
+        } elseif ($hasEvents === 'no') {
+            $query->doesntHave('events');
+        }
+
+        if ($fromDate) {
+            $query->whereDate('created_at', '>=', $fromDate);
+        }
+
+        if ($toDate) {
+            $query->whereDate('created_at', '<=', $toDate);
+        }
+
+        $customers = $query->latest('id')
+            ->paginate(25)
+            ->withQueryString();
+
         return view('customers.index', compact('customers'));
     }
 
@@ -27,13 +64,20 @@ class CustomerController extends Controller
     {
         $validated = $request->validate([
             'name' => 'required|string|max:255',
+            'company_name' => 'nullable|string|max:255',
             'email' => 'nullable|email|max:255',
-            'phone' => 'nullable|string|max:20',
-            'phone2' => 'nullable|string|max:20',
+            'phone' => 'required|string|max:25',
+            'phone2' => 'nullable|string|max:25',
             'address' => 'nullable|string',
-            'nic' => 'nullable|string|max:20',
+            'city' => 'nullable|string|max:100',
+            'postal_code' => 'nullable|string|max:20',
+            'nic' => 'required|string|max:30',
+            'dob' => 'nullable|date',
+            'lead_source' => 'nullable|string|max:100',
             'notes' => 'nullable|string',
+            'is_active' => 'nullable|boolean',
         ]);
+        $validated['is_active'] = $request->has('is_active') ? $request->boolean('is_active') : true;
         $customer = Customer::create($validated);
         if ($request->expectsJson()) {
             return response()->json(['success' => true, 'customer' => $customer]);
@@ -43,7 +87,7 @@ class CustomerController extends Controller
 
     public function show(Customer $customer)
     {
-        $customer->load(['events', 'orders.payments']);
+        $customer->load(['events.subCategory', 'orders.payments']);
         $totalBilled = $customer->orders()->sum('total_amount');
         $totalPaid = $customer->payments()->sum('amount');
         $totalBalance = $totalBilled - $totalPaid;
@@ -59,21 +103,35 @@ class CustomerController extends Controller
     {
         $validated = $request->validate([
             'name' => 'required|string|max:255',
+            'company_name' => 'nullable|string|max:255',
             'email' => 'nullable|email|max:255',
-            'phone' => 'nullable|string|max:20',
-            'phone2' => 'nullable|string|max:20',
+            'phone' => 'required|string|max:25',
+            'phone2' => 'nullable|string|max:25',
             'address' => 'nullable|string',
-            'nic' => 'nullable|string|max:20',
+            'city' => 'nullable|string|max:100',
+            'postal_code' => 'nullable|string|max:20',
+            'nic' => 'required|string|max:30',
+            'dob' => 'nullable|date',
+            'lead_source' => 'nullable|string|max:100',
             'notes' => 'nullable|string',
+            'is_active' => 'nullable|boolean',
         ]);
+        $validated['is_active'] = $request->has('is_active') ? $request->boolean('is_active') : true;
         $customer->update($validated);
         return redirect()->route('customers.index')->with('success', 'Customer updated successfully.');
     }
 
     public function destroy(Customer $customer)
     {
-        $customer->delete();
-        return redirect()->route('customers.index')->with('success', 'Customer deleted.');
+        $customer->update(['is_active' => false]);
+        return redirect()->route('customers.index')->with('success', 'Customer deactivated successfully.');
+    }
+
+    public function toggleStatus(Customer $customer)
+    {
+        $customer->update(['is_active' => !$customer->is_active]);
+        $status = $customer->is_active ? 'activated' : 'deactivated';
+        return redirect()->back()->with('success', "Customer {$status} successfully.");
     }
 
     public function quickStore(Request $request)
@@ -83,6 +141,7 @@ class CustomerController extends Controller
             'phone' => 'nullable|string|max:20',
             'email' => 'nullable|email|max:255',
         ]);
+        $validated['is_active'] = true;
         $customer = Customer::create($validated);
         return response()->json(['success' => true, 'customer' => $customer]);
     }

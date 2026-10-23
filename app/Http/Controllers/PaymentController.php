@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Payment;
 use App\Models\Order;
 use App\Models\Customer;
+use App\Models\Bank;
 use App\Models\BankTransaction;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
@@ -12,18 +13,16 @@ use Illuminate\Support\Facades\DB;
 
 class PaymentController extends Controller
 {
-    public function index()
+    public function index(Request $request)
     {
-        $payments = Payment::with(['customer', 'order'])
-            ->latest()
-            ->paginate(15);
-        return view('payments.index', compact('payments'));
+        return $this->create($request);
     }
 
     public function create(Request $request)
     {
         $customers = Customer::where('is_active', true)->orderBy('name')->get();
-        $orders = Order::with('customer')->latest()->get();
+        $orders = Order::with(['customer', 'event', 'payments'])->latest()->get();
+        $banks = Bank::where('is_active', true)->orderBy('bank_name')->get();
         $selectedOrder = null;
         $selectedCustomer = null;
 
@@ -33,12 +32,12 @@ class PaymentController extends Controller
         }
 
         $today = Carbon::today()->format('Y-m-d');
-        return view('payments.create', compact('customers', 'orders', 'selectedOrder', 'selectedCustomer', 'today'));
+        return view('payments.create', compact('customers', 'orders', 'banks', 'selectedOrder', 'selectedCustomer', 'today'));
     }
 
     public function createForOrder($orderId)
     {
-        return $this->create(request()->merge(['order_id' => $orderId]));
+        return redirect()->route('payments.index', ['order_id' => $orderId]);
     }
 
     public function store(Request $request)
@@ -49,8 +48,8 @@ class PaymentController extends Controller
             'amount' => 'required|numeric|min:0.01',
             'payment_type' => 'required|in:advance,partial,full',
             'payment_method' => 'required|in:cash,cheque,bank_transfer',
-            'cheque_no' => 'nullable|string|max:50',
-            'bank_name' => 'nullable|string|max:100',
+            'cheque_no' => 'nullable|string|max:100',
+            'bank_name' => 'nullable|string|max:255',
             'payment_date' => 'required|date',
             'notes' => 'nullable|string',
         ]);

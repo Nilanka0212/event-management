@@ -1,6 +1,8 @@
 <?php
 
 use Illuminate\Support\Facades\Route;
+use App\Http\Controllers\AuthController;
+use App\Http\Controllers\UserController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\ServiceController;
 use App\Http\Controllers\EventCategoryController;
@@ -15,58 +17,82 @@ use App\Http\Controllers\BankTransactionController;
 use App\Http\Controllers\ReportController;
 use App\Http\Controllers\CalendarController;
 use App\Http\Controllers\NotificationController;
+use App\Http\Controllers\BankController;
 
-Route::get('/', [DashboardController::class, 'index'])->name('dashboard');
+// Public Auth Routes
+Route::get('login', [AuthController::class, 'showLoginForm'])->name('login');
+Route::post('login', [AuthController::class, 'login'])->name('login.post');
+Route::post('logout', [AuthController::class, 'logout'])->name('logout');
 
-// Masters
-Route::resource('services', ServiceController::class);
-Route::resource('event-categories', EventCategoryController::class);
-Route::resource('event-sub-categories', EventSubCategoryController::class);
-Route::get('event-sub-categories/{subCategory}/services', [EventSubCategoryController::class, 'getServices'])->name('event-sub-categories.services');
-Route::get('api/sub-category/{id}', [EventSubCategoryController::class, 'apiGetSubCategory'])->name('api.sub-category');
-Route::get('api/sub-categories/{categoryId}', [EventSubCategoryController::class, 'apiGetByCategory'])->name('api.sub-categories');
+// Authenticated Application Routes
+Route::middleware('auth')->group(function () {
+    Route::get('/', [DashboardController::class, 'index'])->name('dashboard');
 
-// Customers
-Route::resource('customers', CustomerController::class);
-Route::post('customers/quick-store', [CustomerController::class, 'quickStore'])->name('customers.quick-store');
-Route::get('api/customers/search', [CustomerController::class, 'search'])->name('api.customers.search');
+    // Users Management (Admin Only)
+    Route::middleware('role:Admin')->group(function () {
+        Route::resource('users', UserController::class);
+    });
 
-// Events
-Route::resource('events', EventController::class);
-Route::get('events/{event}/create-order', [EventController::class, 'createOrder'])->name('events.create-order');
+    // Masters / Settings
+    Route::middleware('role:Admin,Manager')->group(function () {
+        Route::resource('banks', BankController::class);
+        Route::post('banks/{bank}/toggle-status', [BankController::class, 'toggleStatus'])->name('banks.toggle-status');
+    });
+    Route::resource('services', ServiceController::class);
+    Route::resource('event-categories', EventCategoryController::class);
+    Route::resource('event-sub-categories', EventSubCategoryController::class);
+    Route::get('event-sub-categories/{subCategory}/services', [EventSubCategoryController::class, 'getServices'])->name('event-sub-categories.services');
+    Route::get('api/sub-category/{id}', [EventSubCategoryController::class, 'apiGetSubCategory'])->name('api.sub-category');
+    Route::get('api/sub-categories/{categoryId}', [EventSubCategoryController::class, 'apiGetByCategory'])->name('api.sub-categories');
 
-// Orders
-Route::resource('orders', OrderController::class);
-Route::get('api/orders/event/{eventId}', [OrderController::class, 'getByEvent'])->name('api.orders.event');
+    // Customers
+    Route::resource('customers', CustomerController::class);
+    Route::match(['patch', 'post'], 'customers/{customer}/toggle-status', [CustomerController::class, 'toggleStatus'])->name('customers.toggle-status');
+    Route::post('customers/quick-store', [CustomerController::class, 'quickStore'])->name('customers.quick-store');
+    Route::get('api/customers/search', [CustomerController::class, 'search'])->name('api.customers.search');
 
-// Payments
-Route::resource('payments', PaymentController::class);
-Route::get('payments/create/{orderId}', [PaymentController::class, 'createForOrder'])->name('payments.create-for-order');
+    // Events
+    Route::resource('events', EventController::class);
+    Route::get('events/{event}/create-order', [EventController::class, 'createOrder'])->name('events.create-order');
 
-// Quotations
-Route::resource('quotations', QuotationController::class);
-Route::get('quotations/{quotation}/print', [QuotationController::class, 'print'])->name('quotations.print');
-Route::get('quotations/{quotation}/convert-to-event', [QuotationController::class, 'convertToEvent'])->name('quotations.convert-to-event');
+    // Orders
+    Route::resource('orders', OrderController::class);
+    Route::get('api/orders/event/{eventId}', [OrderController::class, 'getByEvent'])->name('api.orders.event');
+    Route::get('api/event/{eventId}/order-details', [OrderController::class, 'apiGetEventDetails'])->name('api.event.order-details');
 
-// Expenses
-Route::resource('expenses', ExpenseController::class);
+    // Payments
+    Route::resource('payments', PaymentController::class);
+    Route::get('payments/create/{orderId}', [PaymentController::class, 'createForOrder'])->name('payments.create-for-order');
 
-// Bank/Cash Book
-Route::resource('bank-transactions', BankTransactionController::class);
-Route::get('cash-book', [BankTransactionController::class, 'cashBook'])->name('cash-book');
-Route::get('bank-book', [BankTransactionController::class, 'bankBook'])->name('bank-book');
+    // Quotations
+    Route::resource('quotations', QuotationController::class);
+    Route::get('quotations/{quotation}/print', [QuotationController::class, 'print'])->name('quotations.print');
+    Route::get('quotations/{quotation}/convert-to-event', [QuotationController::class, 'convertToEvent'])->name('quotations.convert-to-event');
 
-// Calendar
-Route::get('calendar', [CalendarController::class, 'index'])->name('calendar');
-Route::get('api/calendar/events', [CalendarController::class, 'getEvents'])->name('api.calendar.events');
+    // Expenses
+    Route::post('expenses/categories/quick-store', [ExpenseController::class, 'quickStoreCategory'])->name('expense-categories.quick-store');
+    Route::resource('expenses', ExpenseController::class);
 
-// Reports
-Route::get('reports/order-pl', [ReportController::class, 'orderPL'])->name('reports.order-pl');
-Route::get('reports/monthly-pl', [ReportController::class, 'monthlyPL'])->name('reports.monthly-pl');
-Route::get('reports/customer-credit', [ReportController::class, 'customerCredit'])->name('reports.customer-credit');
-Route::get('reports/order-history', [ReportController::class, 'orderHistory'])->name('reports.order-history');
+    // Bank/Cash Book
+    Route::resource('bank-transactions', BankTransactionController::class);
+    Route::get('cash-book', [BankTransactionController::class, 'cashBook'])->name('cash-book');
+    Route::get('bank-book', [BankTransactionController::class, 'bankBook'])->name('bank-book');
 
-// Notifications
-Route::get('notifications', [NotificationController::class, 'index'])->name('notifications.index');
-Route::post('notifications/{id}/mark-read', [NotificationController::class, 'markRead'])->name('notifications.mark-read');
-Route::post('notifications/mark-all-read', [NotificationController::class, 'markAllRead'])->name('notifications.mark-all-read');
+    // Calendar
+    Route::get('calendar', [CalendarController::class, 'index'])->name('calendar');
+    Route::get('api/calendar/events', [CalendarController::class, 'getEvents'])->name('api.calendar.events');
+
+    // Reports
+    Route::get('reports/payments', [ReportController::class, 'paymentsReport'])->name('reports.payments');
+    Route::get('reports/expenses', [ReportController::class, 'expensesReport'])->name('reports.expenses');
+    Route::get('reports/transactions', [ReportController::class, 'transactionsReport'])->name('reports.transactions');
+    Route::get('reports/order-pl', [ReportController::class, 'orderPL'])->name('reports.order-pl');
+    Route::get('reports/monthly-pl', [ReportController::class, 'monthlyPL'])->name('reports.monthly-pl');
+    Route::get('reports/customer-credit', [ReportController::class, 'customerCredit'])->name('reports.customer-credit');
+    Route::get('reports/order-history', [ReportController::class, 'orderHistory'])->name('reports.order-history');
+
+    // Notifications
+    Route::get('notifications', [NotificationController::class, 'index'])->name('notifications.index');
+    Route::post('notifications/{id}/mark-read', [NotificationController::class, 'markRead'])->name('notifications.mark-read');
+    Route::post('notifications/mark-all-read', [NotificationController::class, 'markAllRead'])->name('notifications.mark-all-read');
+});

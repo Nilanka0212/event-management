@@ -1,1 +1,841 @@
-@include('shared.resource-form', ['formTitle' => 'Create quotation', 'resourceRoute' => 'quotations', 'formAction' => route('quotations.store'), 'fields' => [['name' => 'customer_id', 'label' => 'Customer', 'type' => 'select', 'required' => true, 'options' => $customers->pluck('name', 'id')->all()], ['name' => 'event_name', 'label' => 'Event name'], ['name' => 'event_date', 'label' => 'Event date', 'type' => 'date'], ['name' => 'venue', 'label' => 'Venue'], ['name' => 'quotation_date', 'label' => 'Quotation date', 'type' => 'date', 'required' => true, 'value' => $today], ['name' => 'valid_until', 'label' => 'Valid until', 'type' => 'date'], ['name' => 'discount', 'label' => 'Discount', 'type' => 'number', 'min' => '0', 'step' => '0.01', 'value' => 0], ['name' => 'remarks', 'label' => 'Remarks', 'type' => 'textarea', 'width' => 12]]])
+@extends('layouts.app')
+@section('title', 'Create Quotation')
+@section('page-title', 'Create Quotation')
+
+@section('content')
+<style>
+    /* Custom Styling for Quotation Creation */
+    .quotation-creator-card {
+        border-radius: 16px;
+        border: 1px solid rgba(0, 0, 0, 0.08);
+        box-shadow: 0 4px 24px rgba(0, 0, 0, 0.04);
+        background: #ffffff;
+        overflow: hidden;
+    }
+
+    .quotation-header-banner {
+        background: #ffffff;
+        border-bottom: 1px solid #edf2f7;
+        padding: 16px 22px;
+    }
+
+    .quotation-icon-box {
+        width: 38px;
+        height: 38px;
+        background: rgba(72, 70, 70, 0.08);
+        border: 1px solid rgba(72, 70, 70, 0.12);
+        border-radius: 10px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 17px;
+        color: #484646;
+        flex-shrink: 0;
+    }
+
+    .form-section-title {
+        font-size: 13.5px;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.75px;
+        color: #222d3c;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        margin-bottom: 16px;
+    }
+
+    .form-section-title i {
+        font-size: 16px;
+        color: #484646;
+    }
+
+    .custom-section-box {
+        background: #f8fafc;
+        border: 1px solid #e2e8f0;
+        border-radius: 14px;
+        padding: 20px;
+        margin-bottom: 24px;
+        transition: all 0.2s ease;
+    }
+
+    .custom-section-box:hover {
+        border-color: #cbd5e1;
+    }
+
+    .custom-input-label {
+        font-weight: 600;
+        font-size: 13px;
+        color: #334155;
+        margin-bottom: 6px;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+    }
+
+    .custom-input-label i {
+        color: #94a3b8;
+        font-size: 14px;
+    }
+
+    .form-control, .form-select {
+        border-radius: 8px;
+        border: 1px solid #cbd5e1;
+        padding: 9px 13px;
+        font-size: 13.5px;
+        transition: all 0.2s ease;
+    }
+
+    .form-control:focus, .form-select:focus {
+        border-color: #484646;
+        box-shadow: 0 0 0 3px rgba(72, 70, 70, 0.15);
+    }
+
+    /* Sub-tables */
+    .modern-table-container {
+        border: 1px solid #e2e8f0;
+        border-radius: 10px;
+        background: #ffffff;
+        overflow: hidden;
+    }
+
+    .modern-table {
+        margin-bottom: 0;
+    }
+
+    .modern-table thead th {
+        background: #f1f5f9;
+        color: #475569;
+        font-size: 12px;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        padding: 11px 14px;
+        border-bottom: 1px solid #e2e8f0;
+    }
+
+    .modern-table td {
+        padding: 10px 14px;
+        vertical-align: middle;
+        font-size: 13px;
+    }
+
+    /* Financial Summary Card */
+    .financial-summary-card {
+        background: #ffffff;
+        border: 1px solid #cbd5e1;
+        border-radius: 14px;
+        padding: 20px;
+        box-shadow: 0 4px 16px rgba(0, 0, 0, 0.04);
+    }
+
+    .financial-line-item {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 10px;
+        font-size: 13.5px;
+    }
+
+    .financial-total-banner {
+        background: #f8fafc;
+        border: 1px solid #e2e8f0;
+        border-radius: 10px;
+        padding: 14px 16px;
+        margin: 14px 0;
+    }
+
+    /* Sticky Footer Action Bar */
+    .quotation-action-bar {
+        background: #ffffff;
+        border-top: 1px solid #e2e8f0;
+        padding: 16px 24px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        flex-wrap: wrap;
+        gap: 12px;
+    }
+
+    /* Darker Light Gray Buttons (+ Add) */
+    .btn-light-gray {
+        background: #cbd5e1 !important;
+        border: 1px solid #94a3b8 !important;
+        color: #0f172a !important;
+        font-weight: 600 !important;
+        border-radius: 6px !important;
+        box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05) !important;
+    }
+
+    .btn-light-gray:hover {
+        background: #94a3b8 !important;
+        border-color: #64748b !important;
+        color: #0f172a !important;
+    }
+</style>
+
+<div class="container-fluid px-0">
+    <div class="quotation-creator-card mb-4">
+        <!-- Card Header -->
+        <div class="quotation-header-banner d-flex flex-wrap align-items-center justify-content-between gap-2">
+            <div class="d-flex align-items-center gap-2">
+                <div class="quotation-icon-box">
+                    <i class="bi bi-file-earmark-text"></i>
+                </div>
+                <div>
+                    <h5 class="mb-0 fw-bold text-dark" style="font-size: 15.5px; letter-spacing: -0.2px;">Create Quotation / Estimate</h5>
+                    <small class="text-muted" style="font-size: 12px;">Prepare cost estimates, packages, deliverables, and customized proposals for clients.</small>
+                </div>
+            </div>
+            <div>
+                <a href="{{ route('quotations.index') }}" class="btn btn-sm btn-outline-secondary d-inline-flex align-items-center gap-1.5 px-3">
+                    <i class="bi bi-arrow-left"></i> <span>Back to Quotations</span>
+                </a>
+            </div>
+        </div>
+
+        <div class="card-body p-4">
+            @if(isset($errors) && $errors->any())
+                <div class="alert alert-danger alert-dismissible fade show border-0 shadow-sm mb-4" role="alert">
+                    <div class="d-flex align-items-center gap-2 mb-1">
+                        <i class="bi bi-exclamation-triangle-fill fs-5 text-danger"></i>
+                        <strong class="text-dark">Please correct the following errors:</strong>
+                    </div>
+                    <ul class="mb-0 small ps-4">
+                        @foreach($errors->all() as $err)
+                            <li>{{ $err }}</li>
+                        @endforeach
+                    </ul>
+                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                </div>
+            @endif
+
+            <form method="POST" action="{{ route('quotations.store') }}" id="quotationCreateForm">
+                @csrf
+
+                <!-- Section 1: Customer & Event Information -->
+                <div class="custom-section-box">
+                    <div class="form-section-title">
+                        <i class="bi bi-person-vcard-fill"></i>
+                        <span>Customer & Occasion Details</span>
+                    </div>
+
+                    <div class="row g-3">
+                        <!-- Customer Selection + Quick Add -->
+                        <div class="col-md-6">
+                            <div class="d-flex align-items-center justify-content-between mb-1">
+                                <label class="custom-input-label mb-0">
+                                    <i class="bi bi-person-circle"></i>
+                                    Select Customer <span class="text-danger">*</span>
+                                </label>
+                                <button type="button" class="btn btn-sm btn-light-gray py-0 px-2 fw-semibold" data-bs-toggle="modal" data-bs-target="#quickCustomerModal" style="font-size: 11.5px; height: 26px;">
+                                    <i class="bi bi-person-plus-fill me-1"></i> Quick Add Customer
+                                </button>
+                            </div>
+                            <select name="customer_id" id="customerId" class="form-select" required>
+                                <option value="">-- Choose Customer --</option>
+                                @foreach($customers as $customer)
+                                    <option value="{{ $customer->id }}" {{ old('customer_id') == $customer->id ? 'selected' : '' }}>
+                                        {{ $customer->name }} ({{ $customer->phone ?: 'No phone' }})
+                                    </option>
+                                @endforeach
+                            </select>
+                            <small class="text-muted d-block mt-1" style="font-size: 11.5px;">Choose existing client or click Quick Add to create a new one</small>
+                        </div>
+
+                        <!-- Event / Occasion Name -->
+                        <div class="col-md-6">
+                            <label class="custom-input-label">
+                                <i class="bi bi-tag-fill"></i>
+                                Event / Occasion Name
+                            </label>
+                            <input type="text" name="event_name" id="eventName" class="form-control" value="{{ old('event_name') }}" placeholder="e.g. Ruwan & Anuki Wedding Reception">
+                            <small class="text-muted d-block mt-1" style="font-size: 11.5px;">Event title or purpose for this quotation</small>
+                        </div>
+
+                        <!-- Quotation Date -->
+                        <div class="col-md-4">
+                            <label class="custom-input-label">
+                                <i class="bi bi-calendar-event"></i>
+                                Quotation Date <span class="text-danger">*</span>
+                            </label>
+                            <input type="date" name="quotation_date" class="form-control" value="{{ old('quotation_date', $today) }}" required>
+                        </div>
+
+                        <!-- Valid Until -->
+                        <div class="col-md-4">
+                            <label class="custom-input-label">
+                                <i class="bi bi-calendar-check"></i>
+                                Valid Until
+                            </label>
+                            <input type="date" name="valid_until" class="form-control" value="{{ old('valid_until', \Carbon\Carbon::parse($today)->addDays(14)->format('Y-m-d')) }}">
+                            <small class="text-muted d-block mt-1" style="font-size: 11px;">Default estimate validity: 14 days</small>
+                        </div>
+
+                        <!-- Target Event Date -->
+                        <div class="col-md-4">
+                            <label class="custom-input-label">
+                                <i class="bi bi-calendar-heart"></i>
+                                Target Event Date
+                            </label>
+                            <input type="date" name="event_date" class="form-control" value="{{ old('event_date') }}">
+                        </div>
+
+                        <!-- Venue / Location -->
+                        <div class="col-12">
+                            <label class="custom-input-label">
+                                <i class="bi bi-geo-alt-fill"></i>
+                                Venue / Proposed Location
+                            </label>
+                            <input type="text" name="venue" class="form-control" value="{{ old('venue') }}" placeholder="e.g. Cinnamon Grand Colombo, Cedar Room">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Section 2: Package Preset (Optional) -->
+                <div class="custom-section-box">
+                    <div class="form-section-title">
+                        <i class="bi bi-box-seam-fill"></i>
+                        <span>Package Preset (Optional)</span>
+                    </div>
+
+                    <div class="row g-3">
+                        <!-- Category -->
+                        <div class="col-md-6">
+                            <label class="custom-input-label">
+                                <i class="bi bi-folder2-open"></i>
+                                Select Category
+                            </label>
+                            <select id="categoryId" class="form-select" onchange="onCategoryChange(this.value)">
+                                <option value="">-- Choose Category --</option>
+                                @foreach($categories as $cat)
+                                    <option value="{{ $cat->id }}">{{ $cat->name }}</option>
+                                @endforeach
+                            </select>
+                        </div>
+
+                        <!-- Sub-Category / Package -->
+                        <div class="col-md-6">
+                            <label class="custom-input-label">
+                                <i class="bi bi-boxes"></i>
+                                Select Package Preset
+                            </label>
+                            <select name="event_sub_category_id" id="subCategoryId" class="form-select" onchange="onSubCategoryChange(this.value)">
+                                <option value="">-- Select Category First --</option>
+                            </select>
+                            <small class="text-muted d-block mt-1" style="font-size: 11.5px;">Selecting a package will allow you to auto-populate included services below.</small>
+                        </div>
+                    </div>
+
+                    <!-- Package Services Import Notification Banner -->
+                    <div id="pkgImportBanner" class="mt-3 p-3 bg-white rounded-3 border d-none shadow-sm">
+                        <div class="d-flex align-items-center justify-content-between flex-wrap gap-2">
+                            <div>
+                                <span class="fw-bold text-dark small">
+                                    <i class="bi bi-stars text-primary me-1"></i> Package Selected: <span id="pkgBannerName"></span>
+                                </span>
+                                <div class="text-muted small">
+                                    Standard Sell Price: <strong class="text-dark" id="pkgBannerPrice">Rs. 0.00</strong> &bull; <span id="pkgBannerCount">0</span> services included.
+                                </div>
+                            </div>
+                            <button type="button" class="btn btn-sm btn-primary fw-semibold" onclick="importPackageServicesToQuotation()">
+                                <i class="bi bi-box-arrow-in-down me-1"></i> Import Package Items to Quotation
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Section 3: Quotation Services & Items -->
+                <div class="custom-section-box">
+                    <div class="d-flex align-items-center justify-content-between mb-3 flex-wrap gap-2">
+                        <div class="form-section-title mb-0">
+                            <i class="bi bi-stars"></i>
+                            <span>Services & Quotation Items</span>
+                        </div>
+                        <button type="button" class="btn btn-sm btn-light-gray fw-semibold px-3" onclick="addQuotationServiceRow()">
+                            <i class="bi bi-plus-lg me-1"></i> Add Service
+                        </button>
+                    </div>
+                    <p class="text-muted small mb-3">Add package items, custom service requests, photography, decorations or food deliverables.</p>
+
+                    <div class="modern-table-container">
+                        <table class="table modern-table align-middle" id="quotationServicesTable">
+                            <thead>
+                                <tr>
+                                    <th>Service Preset / Item Description</th>
+                                    <th style="width: 110px;" class="text-center">Qty</th>
+                                    <th style="width: 160px;" class="text-end">Unit Price (Rs.)</th>
+                                    <th style="width: 170px;" class="text-end pe-4">Line Total (Rs.)</th>
+                                    <th style="width: 50px;" class="text-center">Action</th>
+                                </tr>
+                            </thead>
+                            <tbody id="quotationServicesTbody">
+                                <!-- Dynamic Rows -->
+                            </tbody>
+                            <tfoot class="bg-light">
+                                <tr>
+                                    <td colspan="3" class="text-end fw-bold text-secondary">Services Subtotal:</td>
+                                    <td class="text-end pe-4 fw-bold text-dark fs-6" id="servicesTotalDisplay">0.00</td>
+                                    <td></td>
+                                </tr>
+                            </tfoot>
+                        </table>
+                    </div>
+                    <div id="noServicesMsg" class="text-center py-4 bg-white border border-top-0 rounded-bottom text-muted small">
+                        <i class="bi bi-info-circle me-1"></i> No services added yet. Click <strong>"Add Service"</strong> to include line items.
+                    </div>
+                </div>
+
+                <!-- Section 4: Other Charges (Transport, Surcharges) -->
+                <div class="custom-section-box">
+                    <div class="d-flex align-items-center justify-content-between mb-3 flex-wrap gap-2">
+                        <div class="form-section-title mb-0">
+                            <i class="bi bi-truck"></i>
+                            <span>Other Charges (Transport, Hall Rental, Logistics)</span>
+                        </div>
+                        <button type="button" class="btn btn-sm btn-light-gray fw-semibold px-3" onclick="addQuotationChargeRow()">
+                            <i class="bi bi-plus-lg me-1"></i> Add Charge
+                        </button>
+                    </div>
+                    <p class="text-muted small mb-3">Add transport fees, hall booking, cleaning surcharge, or logistical expenses.</p>
+
+                    <div class="modern-table-container">
+                        <table class="table modern-table align-middle" id="quotationChargesTable">
+                            <thead>
+                                <tr>
+                                    <th>Charge Description</th>
+                                    <th style="width: 200px;" class="text-end pe-4">Amount (Rs.)</th>
+                                    <th style="width: 50px;" class="text-center">Action</th>
+                                </tr>
+                            </thead>
+                            <tbody id="quotationChargesTbody">
+                                <!-- Dynamic Rows -->
+                            </tbody>
+                            <tfoot class="bg-light">
+                                <tr>
+                                    <td class="text-end fw-bold text-secondary">Charges Subtotal:</td>
+                                    <td class="text-end pe-4 fw-bold text-dark fs-6" id="chargesTotalDisplay">0.00</td>
+                                    <td></td>
+                                </tr>
+                            </tfoot>
+                        </table>
+                    </div>
+                    <div id="noChargesMsg" class="text-center py-4 bg-white border border-top-0 rounded-bottom text-muted small">
+                        <i class="bi bi-info-circle me-1"></i> No other charges added. Click <strong>"Add Charge"</strong> for logistics or surcharges.
+                    </div>
+                </div>
+
+                <!-- Section 5: Quotation Totals & Terms -->
+                <div class="custom-section-box" style="border-color: #cbd5e1; background: #ffffff;">
+                    <div class="form-section-title">
+                        <i class="bi bi-calculator-fill"></i>
+                        <span>Quotation Totals & Notes</span>
+                    </div>
+
+                    <div class="row g-4 align-items-start">
+                        <div class="col-lg-6">
+                            <div class="mb-3">
+                                <label class="custom-input-label">
+                                    <i class="bi bi-card-text"></i>
+                                    Remarks / Terms & Proposal Notes
+                                </label>
+                                <textarea name="remarks" rows="4" class="form-control" placeholder="Specify quotation terms, validity conditions, advance requirements, or delivery notes...">{{ old('remarks') }}</textarea>
+                            </div>
+
+                            <div class="p-3 bg-light rounded-3 border">
+                                <div class="d-flex align-items-center gap-2 text-primary fw-bold small mb-1">
+                                    <i class="bi bi-check2-circle fs-5 text-success"></i> Fast Conversion to Event:
+                                </div>
+                                <p class="mb-0 text-muted small" style="line-height: 1.5;">
+                                    When the customer approves this estimate, click <strong>"Convert to Event"</strong> from the quotation view to instantly transfer all client details and line items into an active booking!
+                                </p>
+                            </div>
+                        </div>
+
+                        <div class="col-lg-6">
+                            <div class="financial-summary-card">
+                                <div class="financial-line-item">
+                                    <span class="text-muted">Services Subtotal:</span>
+                                    <span class="fw-semibold text-dark" id="sumServicesDisplay">Rs. 0.00</span>
+                                </div>
+                                <div class="financial-line-item">
+                                    <span class="text-muted">Other Charges Subtotal:</span>
+                                    <span class="fw-semibold text-dark" id="sumChargesDisplay">Rs. 0.00</span>
+                                </div>
+                                <div class="financial-line-item pt-2 border-top">
+                                    <span class="text-muted">Special Discount:</span>
+                                    <div class="input-group input-group-sm" style="width: 160px;">
+                                        <input type="number" step="0.01" min="0" name="discount" id="quotationDiscountInput" 
+                                               class="form-control text-end text-danger fw-bold" 
+                                               value="{{ old('discount', '0.00') }}" 
+                                               oninput="calculateQuotationTotals()">
+                                    </div>
+                                </div>
+
+                                <div class="financial-total-banner d-flex justify-content-between align-items-center">
+                                    <div>
+                                        <div class="small fw-bold text-uppercase text-muted" style="letter-spacing: 0.5px;">Estimated Total Value</div>
+                                        <small class="text-muted">Net quoted price</small>
+                                    </div>
+                                    <div class="fs-4 fw-bold text-primary" id="finalQuotationTotalDisplay">
+                                        Rs. 0.00
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Sticky Action Footer Bar -->
+                <div class="quotation-action-bar rounded-3">
+                    <div class="d-flex align-items-center gap-2">
+                        <!-- <span class="badge bg-light text-dark border px-3 py-2">
+                            <i class="bi bi-shield-check text-success me-1"></i> Estimates generated live
+                        </span> -->
+                    </div>
+                    <div class="d-flex align-items-center gap-2">
+                        <a href="{{ route('quotations.index') }}" class="btn btn-outline-secondary px-4 fw-semibold">
+                            Cancel
+                        </a>
+                        <button type="submit" class="btn btn-primary px-4 fw-bold shadow-sm" id="btnSubmitQuotation">
+                            <i class="bi bi-file-earmark-check me-1"></i> Save Quotation
+                        </button>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Modal: Quick Add Customer -->
+<div class="modal fade" id="quickCustomerModal" tabindex="-1" aria-labelledby="quickCustomerModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow-lg" style="border-radius: 16px; overflow: hidden;">
+            <div class="modal-header bg-dark text-white p-3 px-4">
+                <h5 class="modal-title fw-bold fs-6 text-white" id="quickCustomerModalLabel">
+                    <i class="bi bi-person-plus-fill text-warning me-2"></i>Quick Add New Customer
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body p-4">
+                <div id="quickCustomerAlert" class="d-none alert alert-danger py-2 small"></div>
+                <form id="quickCustomerForm">
+                    <div class="mb-3">
+                        <label class="custom-input-label">
+                            <i class="bi bi-person"></i> Customer Name <span class="text-danger">*</span>
+                        </label>
+                        <input type="text" id="quickName" class="form-control" placeholder="Customer Name" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="custom-input-label">
+                            <i class="bi bi-telephone"></i> Phone Number
+                        </label>
+                        <input type="text" id="quickPhone" class="form-control" placeholder="e.g. +94 77 123 4567">
+                    </div>
+                    <div class="mb-3">
+                        <label class="custom-input-label">
+                            <i class="bi bi-envelope"></i> Email Address
+                        </label>
+                        <input type="email" id="quickEmail" class="form-control" placeholder="e.g. customer@example.com">
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer bg-light p-3 px-4">
+                <button type="button" class="btn btn-outline-secondary px-3" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary px-3 fw-semibold" id="btnSaveQuickCustomer" onclick="saveQuickCustomer()">
+                    <i class="bi bi-check-lg me-1"></i> Save & Select
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+@endsection
+
+@section('scripts')
+<script>
+    const availableServices = @json($services);
+    let qServiceIndex = 0;
+    let qChargeIndex = 0;
+    let selectedPackageData = null;
+
+    // Quick Add Customer via AJAX
+    function saveQuickCustomer() {
+        const name = document.getElementById('quickName').value.trim();
+        const phone = document.getElementById('quickPhone').value.trim();
+        const email = document.getElementById('quickEmail').value.trim();
+        const alertBox = document.getElementById('quickCustomerAlert');
+
+        if (!name) {
+            alertBox.classList.remove('d-none');
+            alertBox.innerText = 'Customer name is required.';
+            return;
+        }
+
+        const btn = document.getElementById('btnSaveQuickCustomer');
+        btn.disabled = true;
+        btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span> Saving...';
+
+        fetch('{{ route("customers.quick-store") }}', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
+                'Accept': 'application/json'
+            },
+            body: JSON.stringify({ name, phone, email })
+        })
+        .then(res => res.json())
+        .then(data => {
+            btn.disabled = false;
+            btn.innerHTML = '<i class="bi bi-check-lg me-1"></i> Save & Select';
+
+            if (data.success && data.customer) {
+                const customerSelect = document.getElementById('customerId');
+                const opt = new Option(`${data.customer.name} (${data.customer.phone || 'No phone'})`, data.customer.id, true, true);
+                customerSelect.add(opt);
+
+                const eventNameInput = document.getElementById('eventName');
+                if (!eventNameInput.value) {
+                    eventNameInput.value = data.customer.name + ' Event';
+                }
+
+                const modalEl = document.getElementById('quickCustomerModal');
+                const modal = bootstrap.Modal.getInstance(modalEl) || new bootstrap.Modal(modalEl);
+                modal.hide();
+                document.getElementById('quickCustomerForm').reset();
+                alertBox.classList.add('d-none');
+            } else {
+                alertBox.classList.remove('d-none');
+                alertBox.innerText = data.message || 'Failed to save customer.';
+            }
+        })
+        .catch(err => {
+            btn.disabled = false;
+            btn.innerHTML = '<i class="bi bi-check-lg me-1"></i> Save & Select';
+            alertBox.classList.remove('d-none');
+            alertBox.innerText = 'An error occurred while saving.';
+        });
+    }
+
+    // Category Change -> Cascade Sub-Categories (Packages)
+    function onCategoryChange(categoryId) {
+        const subSelect = document.getElementById('subCategoryId');
+        subSelect.innerHTML = '<option value="">-- Loading Packages... --</option>';
+        document.getElementById('pkgImportBanner').classList.add('d-none');
+        selectedPackageData = null;
+
+        if (!categoryId) {
+            subSelect.innerHTML = '<option value="">-- Select Category First --</option>';
+            return;
+        }
+
+        fetch(`/api/sub-categories/${categoryId}`)
+            .then(res => res.json())
+            .then(data => {
+                subSelect.innerHTML = '<option value="">-- Select Package --</option>';
+                data.forEach(sub => {
+                    const opt = document.createElement('option');
+                    opt.value = sub.id;
+                    opt.text = `${sub.name} (Sell: Rs. ${parseFloat(sub.sell_price).toLocaleString()})`;
+                    subSelect.appendChild(opt);
+                });
+            })
+            .catch(() => {
+                subSelect.innerHTML = '<option value="">Error loading packages</option>';
+            });
+    }
+
+    // Sub-Category Change -> Load Package Details
+    function onSubCategoryChange(subCategoryId) {
+        if (!subCategoryId) {
+            document.getElementById('pkgImportBanner').classList.add('d-none');
+            selectedPackageData = null;
+            return;
+        }
+
+        fetch(`/api/sub-category/${subCategoryId}`)
+            .then(res => res.json())
+            .then(data => {
+                selectedPackageData = data;
+                document.getElementById('pkgBannerName').innerText = data.name;
+                document.getElementById('pkgBannerPrice').innerText = 'Rs. ' + parseFloat(data.sell_price).toLocaleString();
+                document.getElementById('pkgBannerCount').innerText = data.services ? data.services.length : 0;
+                document.getElementById('pkgImportBanner').classList.remove('d-none');
+            });
+    }
+
+    // Import package services to quotation table
+    function importPackageServicesToQuotation() {
+        if (!selectedPackageData) return;
+
+        // Add base package item or its services
+        if (selectedPackageData.services && selectedPackageData.services.length > 0) {
+            selectedPackageData.services.forEach(svc => {
+                addQuotationServiceRowCustom(svc.service_name, svc.qty || 1, svc.unit_price, svc.service_id);
+            });
+        } else {
+            addQuotationServiceRowCustom(`${selectedPackageData.name} Package`, 1, parseFloat(selectedPackageData.sell_price));
+        }
+
+        calculateQuotationTotals();
+    }
+
+    // Add Quotation Service Row
+    function addQuotationServiceRow() {
+        addQuotationServiceRowCustom('', 1, 0, null);
+    }
+
+    function addQuotationServiceRowCustom(description = '', qty = 1, unitPrice = 0, serviceId = null) {
+        const tbody = document.getElementById('quotationServicesTbody');
+        const emptyMsg = document.getElementById('noServicesMsg');
+        if (emptyMsg) emptyMsg.classList.add('d-none');
+
+        const idx = qServiceIndex++;
+
+        let serviceOptions = '<option value="">-- Custom / Select Service --</option>';
+        availableServices.forEach(svc => {
+            serviceOptions += `<option value="${svc.id}" data-price="${svc.cost_price}" data-name="${svc.name}" ${serviceId == svc.id ? 'selected' : ''}>${svc.name}</option>`;
+        });
+
+        const tr = document.createElement('tr');
+        tr.id = `qsvc_row_${idx}`;
+        tr.innerHTML = `
+            <td>
+                <div class="row g-1">
+                    <div class="col-md-5">
+                        <select class="form-select form-select-sm" onchange="onSelectQuotationServicePreset(this, ${idx})">
+                            ${serviceOptions}
+                        </select>
+                    </div>
+                    <div class="col-md-7">
+                        <input type="hidden" name="services[${idx}][service_id]" id="qsvc_id_${idx}" value="${serviceId || ''}">
+                        <input type="text" name="services[${idx}][description]" id="qsvc_desc_${idx}" class="form-control form-control-sm" value="${description}" placeholder="Service description..." required>
+                    </div>
+                </div>
+            </td>
+            <td>
+                <input type="number" min="1" step="1" name="services[${idx}][qty]" id="qsvc_qty_${idx}" class="form-control form-control-sm text-center" value="${qty}" oninput="calcQuotationServiceLine(${idx})">
+            </td>
+            <td>
+                <input type="number" step="0.01" min="0" name="services[${idx}][unit_price]" id="qsvc_price_${idx}" class="form-control form-control-sm text-end" value="${parseFloat(unitPrice).toFixed(2)}" oninput="calcQuotationServiceLine(${idx})">
+            </td>
+            <td class="text-end pe-4 fw-bold text-dark" id="qsvc_line_total_${idx}">
+                ${(qty * unitPrice).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+            </td>
+            <td class="text-center">
+                <button type="button" class="btn-action btn-action-delete mx-auto" onclick="removeQuotationServiceRow(${idx})" title="Remove service">
+                    <i class="bi bi-trash3"></i>
+                </button>
+            </td>
+        `;
+        tbody.appendChild(tr);
+        calcQuotationServiceLine(idx);
+    }
+
+    function onSelectQuotationServicePreset(selectEl, idx) {
+        const selectedOpt = selectEl.options[selectEl.selectedIndex];
+        const svcId = selectedOpt.value;
+        const svcName = selectedOpt.getAttribute('data-name');
+        const svcPrice = selectedOpt.getAttribute('data-price');
+
+        if (svcId) {
+            document.getElementById(`qsvc_id_${idx}`).value = svcId;
+            document.getElementById(`qsvc_desc_${idx}`).value = svcName;
+            document.getElementById(`qsvc_price_${idx}`).value = svcPrice || '0.00';
+        }
+        calcQuotationServiceLine(idx);
+    }
+
+    function calcQuotationServiceLine(idx) {
+        const qty = parseInt(document.getElementById(`qsvc_qty_${idx}`)?.value) || 1;
+        const price = parseFloat(document.getElementById(`qsvc_price_${idx}`)?.value) || 0;
+        const lineTotal = qty * price;
+        const cell = document.getElementById(`qsvc_line_total_${idx}`);
+        if (cell) {
+            cell.innerText = lineTotal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+        }
+        calculateQuotationTotals();
+    }
+
+    function removeQuotationServiceRow(idx) {
+        document.getElementById(`qsvc_row_${idx}`)?.remove();
+        const tbody = document.getElementById('quotationServicesTbody');
+        const emptyMsg = document.getElementById('noServicesMsg');
+        if (tbody.querySelectorAll('tr').length === 0 && emptyMsg) {
+            emptyMsg.classList.remove('d-none');
+        }
+        calculateQuotationTotals();
+    }
+
+    // Add Other Charge Row
+    function addQuotationChargeRow() {
+        addQuotationChargeRowCustom('', 0);
+    }
+
+    function addQuotationChargeRowCustom(description = '', amount = 0) {
+        const tbody = document.getElementById('quotationChargesTbody');
+        const emptyMsg = document.getElementById('noChargesMsg');
+        if (emptyMsg) emptyMsg.classList.add('d-none');
+
+        const idx = qChargeIndex++;
+
+        const tr = document.createElement('tr');
+        tr.id = `qcharge_row_${idx}`;
+        tr.innerHTML = `
+            <td>
+                <input type="text" name="other_charges[${idx}][description]" class="form-control form-control-sm" value="${description}" placeholder="Charge description (e.g. Transport, Hall Fee)..." required>
+            </td>
+            <td class="pe-4">
+                <input type="number" step="0.01" min="0" name="other_charges[${idx}][amount]" class="form-control form-control-sm text-end quotation-charge-amount-input" value="${parseFloat(amount).toFixed(2)}" oninput="calculateQuotationTotals()">
+            </td>
+            <td class="text-center">
+                <button type="button" class="btn-action btn-action-delete mx-auto" onclick="removeQuotationChargeRow(${idx})" title="Remove charge">
+                    <i class="bi bi-trash3"></i>
+                </button>
+            </td>
+        `;
+        tbody.appendChild(tr);
+        calculateQuotationTotals();
+    }
+
+    function removeQuotationChargeRow(idx) {
+        document.getElementById(`qcharge_row_${idx}`)?.remove();
+        const tbody = document.getElementById('quotationChargesTbody');
+        const emptyMsg = document.getElementById('noChargesMsg');
+        if (tbody.querySelectorAll('tr').length === 0 && emptyMsg) {
+            emptyMsg.classList.remove('d-none');
+        }
+        calculateQuotationTotals();
+    }
+
+    // Calculate Quotation Totals
+    function calculateQuotationTotals() {
+        let servicesTotal = 0;
+        document.querySelectorAll('#quotationServicesTbody tr').forEach(row => {
+            const qty = parseInt(row.querySelector('[id^="qsvc_qty_"]')?.value) || 0;
+            const price = parseFloat(row.querySelector('[id^="qsvc_price_"]')?.value) || 0;
+            servicesTotal += qty * price;
+        });
+
+        let chargesTotal = 0;
+        document.querySelectorAll('.quotation-charge-amount-input').forEach(input => {
+            chargesTotal += parseFloat(input.value) || 0;
+        });
+
+        const discount = parseFloat(document.getElementById('quotationDiscountInput')?.value) || 0;
+        const subtotal = servicesTotal + chargesTotal;
+        const finalTotal = Math.max(0, subtotal - discount);
+
+        document.getElementById('servicesTotalDisplay').innerText = servicesTotal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+        document.getElementById('chargesTotalDisplay').innerText = chargesTotal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+        document.getElementById('sumServicesDisplay').innerText = 'Rs. ' + servicesTotal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+        document.getElementById('sumChargesDisplay').innerText = 'Rs. ' + chargesTotal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+        document.getElementById('finalQuotationTotalDisplay').innerText = 'Rs. ' + finalTotal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    }
+
+    document.addEventListener('DOMContentLoaded', () => {
+        calculateQuotationTotals();
+    });
+</script>
+@endsection

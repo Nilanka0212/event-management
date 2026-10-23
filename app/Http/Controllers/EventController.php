@@ -9,6 +9,7 @@ use App\Models\EventCategory;
 use App\Models\EventSubCategory;
 use App\Models\Customer;
 use App\Models\Order;
+use App\Models\Quotation;
 use App\Models\Service;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
@@ -19,26 +20,88 @@ class EventController extends Controller
     public function index()
     {
         $search = request('search');
+        $customerId = request('customer_id');
+        $eventId = request('event_id');
+        $subCategoryId = request('sub_category_id');
+        $fromDate = request('from_date');
+        $toDate = request('to_date');
         $status = request('status');
+        $tab = request('tab', 'all');
 
-        $events = Event::with(['customer', 'subCategory.category'])
-            ->when($search, fn($q) => $q->where('event_name', 'like', "%$search%")
-                ->orWhere('event_no', 'like', "%$search%")
-                ->orWhereHas('customer', fn($q2) => $q2->where('name', 'like', "%$search%")))
-            ->when($status, fn($q) => $q->where('status', $status))
-            ->latest()
-            ->paginate(15);
+        $baseQuery = Event::with(['customer', 'subCategory.category', 'order'])
+            ->when($search, function ($q) use ($search) {
+                $q->where(function ($sub) use ($search) {
+                    $sub->where('event_name', 'like', "%{$search}%")
+                        ->orWhere('event_no', 'like', "%{$search}%")
+                        ->orWhere('venue', 'like', "%{$search}%")
+                        ->orWhereHas('customer', fn($c) => $c->where('name', 'like', "%{$search}%")->orWhere('phone', 'like', "%{$search}%"));
+                });
+            })
+            ->when($customerId, fn($q) => $q->where('customer_id', $customerId))
+            ->when($eventId, fn($q) => $q->where('id', $eventId))
+            ->when($subCategoryId, fn($q) => $q->where('event_sub_category_id', $subCategoryId))
+            ->when($fromDate, fn($q) => $q->whereDate('event_date', '>=', $fromDate))
+            ->when($toDate, fn($q) => $q->whereDate('event_date', '<=', $toDate))
+            ->when($status, fn($q) => $q->where('status', $status));
 
-        return view('events.index', compact('events'));
+        // Tab counts based on current filters
+        $countAll = (clone $baseQuery)->count();
+        $countOrdered = (clone $baseQuery)->has('orders')->count();
+        $countNoOrder = (clone $baseQuery)->doesntHave('orders')->count();
+
+        // Apply tab filter
+        $query = clone $baseQuery;
+        if ($tab === 'ordered') {
+            $query->has('orders');
+        } elseif ($tab === 'no_order') {
+            $query->doesntHave('orders');
+        }
+
+        $events = $query->latest('event_date')->paginate(25)->withQueryString();
+
+        $customers = Customer::where('is_active', true)->orderBy('name')->get(['id', 'name', 'phone']);
+        $subCategories = EventSubCategory::with('category')->where('is_active', true)->orderBy('name')->get();
+        $eventList = Event::orderBy('event_name')->get(['id', 'event_name', 'event_no']);
+
+        return view('events.index', compact(
+            'events',
+            'customers',
+            'subCategories',
+            'eventList',
+            'tab',
+            'countAll',
+            'countOrdered',
+            'countNoOrder'
+        ));
     }
 
-    public function create()
+    public function create(Request $request)
     {
         $categories = EventCategory::where('is_active', true)->get();
         $customers = Customer::where('is_active', true)->orderBy('name')->get();
         $services = Service::where('is_active', true)->get();
         $today = Carbon::today()->format('Y-m-d');
-        return view('events.create', compact('categories', 'customers', 'services', 'today'));
+
+        $quotation = null;
+        $initialSubCategories = collect();
+
+        if ($request->filled('quotation_id')) {
+            $quotation = Quotation::with([
+                'customer',
+                'subCategory.category',
+                'subCategory.subCategoryServices.service',
+                'services.service',
+                'otherCharges'
+            ])->find($request->input('quotation_id'));
+
+            if ($quotation && $quotation->subCategory) {
+                $initialSubCategories = EventSubCategory::where('event_category_id', $quotation->subCategory->event_category_id)
+                    ->where('is_active', true)
+                    ->get();
+            }
+        }
+
+        return view('events.create', compact('categories', 'customers', 'services', 'today', 'quotation', 'initialSubCategories'));
     }
 
     public function store(Request $request)
@@ -108,7 +171,14 @@ class EventController extends Controller
 
     public function show(Event $event)
     {
-        $event->load(['customer', 'subCategory.category', 'additionalServices.service', 'otherCharges', 'orders.payments']);
+        $event->load([
+            'customer',
+            'subCategory.category',
+            'subCategory.subCategoryServices.service',
+            'additionalServices.service',
+            'otherCharges',
+            'orders.payments'
+        ]);
         return view('events.show', compact('event'));
     }
 
@@ -117,7 +187,7 @@ class EventController extends Controller
         $categories = EventCategory::where('is_active', true)->get();
         $customers = Customer::where('is_active', true)->orderBy('name')->get();
         $services = Service::where('is_active', true)->get();
-        $event->load(['subCategory', 'additionalServices.service', 'otherCharges']);
+        $event->load(['subCategory.category', 'subCategory.subCategoryServices.service', 'additionalServices.service', 'otherCharges']);
         return view('events.edit', compact('event', 'categories', 'customers', 'services'));
     }
 
@@ -203,17 +273,39 @@ class EventController extends Controller
             'customer_id' => $event->customer_id,
             'order_date' => $event->today_date,
             'sub_total' => $event->total_amount,
-            'discount' => 0,
+            'discount' => $event->discount ?? 0,
             'total_amount' => $event->total_amount,
             'paid_amount' => $advanceAmount,
-            'balance' => $event->total_amount - $advanceAmount,
-            'payment_status' => $advanceAmount >= $event->total_amount ? 'paid' : 'partial',
+            'balance' => max(0, $event->total_amount - $advanceAmount),
+            'payment_status' => $advanceAmount >= $event->total_amount ? 'paid' : ($advanceAmount > 0 ? 'partial' : 'pending'),
             'notes' => 'Auto-created from event registration advance payment.',
             'is_auto_created' => true,
         ]);
 
+        // Copy event additional services to order
+        $event->load('additionalServices', 'otherCharges');
+        foreach ($event->additionalServices as $svc) {
+            \App\Models\OrderService::create([
+                'order_id' => $order->id,
+                'service_id' => $svc->service_id,
+                'description' => $svc->description,
+                'qty' => $svc->qty,
+                'unit_price' => $svc->unit_price,
+                'total_price' => $svc->total_price,
+            ]);
+        }
+
+        // Copy event other charges to order
+        foreach ($event->otherCharges as $charge) {
+            \App\Models\OrderOtherCharge::create([
+                'order_id' => $order->id,
+                'description' => $charge->description,
+                'amount' => $charge->amount,
+            ]);
+        }
+
         // Record payment
-        \App\Models\Payment::create([
+        $payment = \App\Models\Payment::create([
             'order_id' => $order->id,
             'customer_id' => $event->customer_id,
             'amount' => $advanceAmount,
@@ -221,6 +313,17 @@ class EventController extends Controller
             'payment_method' => 'cash',
             'payment_date' => $event->today_date,
             'notes' => 'Advance payment during event registration.',
+        ]);
+
+        // Log to BankTransaction / Cash Book
+        \App\Models\BankTransaction::create([
+            'type' => 'income',
+            'transaction_method' => 'cash',
+            'account_type' => 'cash',
+            'amount' => $advanceAmount,
+            'description' => 'Advance payment - Event ' . $event->event_no . ' (Order ' . $order->order_no . ')',
+            'transaction_date' => $event->today_date,
+            'reference_no' => $payment->payment_no,
         ]);
 
         return $order;

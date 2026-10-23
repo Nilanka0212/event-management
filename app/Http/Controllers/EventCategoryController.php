@@ -9,7 +9,7 @@ class EventCategoryController extends Controller
 {
     public function index()
     {
-        $categories = EventCategory::withCount('subCategories')->latest()->paginate(15);
+        $categories = EventCategory::withCount('subCategories')->latest()->paginate(25)->withQueryString();
         return view('event-categories.index', compact('categories'));
     }
 

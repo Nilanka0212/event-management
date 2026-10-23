@@ -38,42 +38,56 @@
 @section('page-title', $formTitle)
 
 @section('content')
-<div class="page-header"><div><h4>{{ $formTitle }}</h4><p class="text-muted mb-0">{{ $formDescription ?? 'Enter the details below.' }}</p></div><a href="{{ route($resourceRoute . '.index') }}" class="btn btn-outline-secondary"><i class="bi bi-arrow-left me-1"></i> Back</a></div>
+<div class="page-header d-flex flex-wrap align-items-center justify-content-between gap-3 mb-3">
+    <div>
+        <h4 class="fw-bold mb-1" style="color: #0f172a; letter-spacing: -0.3px;">{{ $formTitle }}</h4>
+        <p class="text-muted small mb-0">{{ $formDescription ?? 'Enter the details below.' }}</p>
+    </div>
+    <a href="{{ route($resourceRoute . '.index') }}" class="btn btn-sm btn-outline-secondary">
+        <i class="bi bi-arrow-left me-1"></i> Back
+    </a>
+</div>
 <form method="POST" action="{{ $formAction }}">
     @csrf
     @if(!empty($formMethod) && $formMethod !== 'POST')@method($formMethod)@endif
-    <div class="card"><div class="card-body"><div class="row g-3">
-        @foreach($fields as $field)
-            @php
-                $fieldValue = old($field['name'], data_get($record ?? null, $field['value_key'] ?? $field['name'], $field['value'] ?? ''));
-                $fieldType = $field['type'] ?? 'text';
-                $fieldWidth = $field['width'] ?? 6;
-                if ($fieldType === 'date' && is_object($fieldValue) && method_exists($fieldValue, 'format')) {
-                    $fieldValue = $fieldValue->format('Y-m-d');
-                }
-            @endphp
-            <div class="col-12 col-md-{{ $fieldWidth }}">
-                <label class="form-label" for="{{ str_replace(['[', ']'], ['_', ''], $field['name']) }}">{{ $field['label'] }} @if(!empty($field['required']))<span class="text-danger">*</span>@endif</label>
-                @if($fieldType === 'textarea')
-                    <textarea id="{{ $field['name'] }}" name="{{ $field['name'] }}" rows="{{ $field['rows'] ?? 3 }}" class="form-control @error($field['name']) is-invalid @enderror" @required(!empty($field['required']))>{{ $fieldValue }}</textarea>
-                @elseif($fieldType === 'select')
-                    <select id="{{ $field['name'] }}" name="{{ $field['name'] }}" class="form-select @error($field['name']) is-invalid @enderror" @required(!empty($field['required']))>
-                        @if(empty($field['required']))<option value="">Select {{ strtolower($field['label']) }}</option>@endif
-                        @foreach($field['options'] ?? [] as $optionValue => $optionLabel)<option value="{{ $optionValue }}" @selected((string) $fieldValue === (string) $optionValue)>{{ $optionLabel }}</option>@endforeach
-                    </select>
-                @elseif($fieldType === 'checkbox')
-                    <div class="form-check mt-2"><input id="{{ $field['name'] }}" name="{{ $field['name'] }}" value="1" type="checkbox" class="form-check-input" @checked((bool) $fieldValue)><label class="form-check-label" for="{{ $field['name'] }}">{{ $field['checkLabel'] ?? 'Enabled' }}</label></div>
-                @else
-                    <input id="{{ $field['name'] }}" name="{{ $field['name'] }}" type="{{ $fieldType }}" value="{{ $fieldValue }}" class="form-control @error($field['name']) is-invalid @enderror" @required(!empty($field['required'])) @if(isset($field['min'])) min="{{ $field['min'] }}" @endif @if(isset($field['step'])) step="{{ $field['step'] }}" @endif @if(isset($field['placeholder'])) placeholder="{{ $field['placeholder'] }}" @endif>
+    <div class="card shadow-sm border-0 mb-4">
+        <div class="card-body p-3 p-md-4">
+            <div class="row g-3">
+                @foreach($fields as $field)
+                    @php
+                        $fieldValue = old($field['name'], data_get($record ?? null, $field['value_key'] ?? $field['name'], $field['value'] ?? ''));
+                        $fieldType = $field['type'] ?? 'text';
+                        $fieldWidth = $field['width'] ?? 6;
+                        if ($fieldType === 'date' && is_object($fieldValue) && method_exists($fieldValue, 'format')) {
+                            $fieldValue = $fieldValue->format('Y-m-d');
+                        }
+                    @endphp
+                    <div class="col-12 col-md-{{ $fieldWidth }}">
+                        <label class="form-label" for="{{ str_replace(['[', ']'], ['_', ''], $field['name']) }}">{{ $field['label'] }} @if(!empty($field['required']))<span class="text-danger">*</span>@endif</label>
+                        @if($fieldType === 'textarea')
+                            <textarea id="{{ $field['name'] }}" name="{{ $field['name'] }}" rows="{{ $field['rows'] ?? 3 }}" class="form-control @error($field['name']) is-invalid @enderror" @required(!empty($field['required']))>{{ $fieldValue }}</textarea>
+                        @elseif($fieldType === 'select')
+                            <select id="{{ $field['name'] }}" name="{{ $field['name'] }}" class="form-select @error($field['name']) is-invalid @enderror" @required(!empty($field['required']))>
+                                @if(empty($field['required']))<option value="">Select {{ strtolower($field['label']) }}</option>@endif
+                                @foreach($field['options'] ?? [] as $optionValue => $optionLabel)<option value="{{ $optionValue }}" @selected((string) $fieldValue === (string) $optionValue)>{{ $optionLabel }}</option>@endforeach
+                            </select>
+                        @elseif($fieldType === 'checkbox')
+                            <div class="form-check mt-2"><input id="{{ $field['name'] }}" name="{{ $field['name'] }}" value="1" type="checkbox" class="form-check-input" @checked((bool) $fieldValue)><label class="form-check-label" for="{{ $field['name'] }}">{{ $field['checkLabel'] ?? 'Enabled' }}</label></div>
+                        @else
+                            <input id="{{ $field['name'] }}" name="{{ $field['name'] }}" type="{{ $fieldType }}" value="{{ $fieldValue }}" class="form-control @error($field['name']) is-invalid @enderror" @required(!empty($field['required'])) @if(isset($field['min'])) min="{{ $field['min'] }}" @endif @if(isset($field['step'])) step="{{ $field['step'] }}" @endif @if(isset($field['placeholder'])) placeholder="{{ $field['placeholder'] }}" @endif>
+                        @endif
+                        @error($field['name'])<div class="invalid-feedback">{{ $message }}</div>@enderror
+                    </div>
+                @endforeach
+                @if(!empty($lineItemConfig))
+                    @include('shared.line-items', ['config' => $lineItemConfig])
                 @endif
-                @error($field['name'])<div class="invalid-feedback">{{ $message }}</div>@enderror
             </div>
-        @endforeach
-        @if(!empty($lineItemConfig))
-            @include('shared.line-items', ['config' => $lineItemConfig])
-        @endif
-    </div></div>
-    <div class="card-footer bg-white d-flex justify-content-end gap-2"><a href="{{ route($resourceRoute . '.index') }}" class="btn btn-light">Cancel</a><button type="submit" class="btn btn-primary"><i class="bi bi-check2 me-1"></i> {{ $submitLabel ?? 'Save' }}</button></div>
+        </div>
+        <div class="card-footer bg-white border-top d-flex flex-wrap justify-content-end gap-2 p-3">
+            <a href="{{ route($resourceRoute . '.index') }}" class="btn btn-outline-secondary">Cancel</a>
+            <button type="submit" class="btn btn-primary shadow-sm"><i class="bi bi-check2 me-1"></i> {{ $submitLabel ?? 'Save Record' }}</button>
+        </div>
     </div>
 </form>
 @endsection

@@ -12,7 +12,7 @@ class EventSubCategoryController extends Controller
 {
     public function index()
     {
-        $subCategories = EventSubCategory::with('category')->latest()->paginate(15);
+        $subCategories = EventSubCategory::with('category')->latest()->paginate(25)->withQueryString();
         return view('event-sub-categories.index', compact('subCategories'));
     }
 

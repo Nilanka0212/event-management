@@ -8,12 +8,14 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 class Customer extends Model
 {
     protected $fillable = [
-        'name', 'email', 'phone', 'phone2', 
-        'address', 'nic', 'notes', 'is_active'
+        'name', 'company_name', 'email', 'phone', 'phone2', 
+        'address', 'city', 'postal_code', 'nic', 'dob',
+        'notes', 'lead_source', 'is_active'
     ];
 
     protected $casts = [
         'is_active' => 'boolean',
+        'dob' => 'date',
     ];
 
     public function events(): HasMany

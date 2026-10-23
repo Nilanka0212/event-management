@@ -13,22 +13,22 @@ class NotificationController extends Controller
     {
         $today = Carbon::today();
 
-        $events7Days = Event::with(['customer', 'subCategory'])
+        $events7Days = Event::with(['customer', 'subCategory', 'orders.payments'])
             ->whereDate('event_date', $today->copy()->addDays(7))
             ->where('status', '!=', 'cancelled')
             ->get();
 
-        $events3Days = Event::with(['customer', 'subCategory'])
+        $events3Days = Event::with(['customer', 'subCategory', 'orders.payments'])
             ->whereDate('event_date', $today->copy()->addDays(3))
             ->where('status', '!=', 'cancelled')
             ->get();
 
-        $upcomingEvents = Event::with(['customer', 'subCategory'])
+        $upcomingEvents = Event::with(['customer', 'subCategory', 'orders.payments'])
             ->where('event_date', '>=', $today)
             ->where('status', '!=', 'cancelled')
             ->orderBy('event_date')
-            ->limit(20)
-            ->get();
+            ->paginate(25)
+            ->withQueryString();
 
         return view('notifications.index', compact('events7Days', 'events3Days', 'upcomingEvents'));
     }

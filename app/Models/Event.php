@@ -66,6 +66,11 @@ class Event extends Model
         return $this->hasMany(EventOtherCharge::class);
     }
 
+    public function order(): HasOne
+    {
+        return $this->hasOne(Order::class)->latestOfMany();
+    }
+
     public function orders(): HasMany
     {
         return $this->hasMany(Order::class);

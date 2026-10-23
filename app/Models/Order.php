@@ -61,6 +61,11 @@ class Order extends Model
         return $this->hasMany(Payment::class);
     }
 
+    public function expenses(): HasMany
+    {
+        return $this->hasMany(Expense::class);
+    }
+
     public function recalculateTotals(): void
     {
         $servicesTotal = $this->services()->sum('total_price');
