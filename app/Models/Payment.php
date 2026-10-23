@@ -4,12 +4,13 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 
 class Payment extends Model
 {
     protected $fillable = [
         'payment_no', 'order_id', 'customer_id', 'amount',
-        'payment_type', 'payment_method', 'cheque_no', 'bank_name',
+        'payment_type', 'payment_method', 'status', 'cheque_no', 'bank_name',
         'payment_date', 'notes'
     ];
 
@@ -29,10 +30,13 @@ class Payment extends Model
             }
         });
         static::created(function ($model) {
-            $model->order->recalculateTotals();
+            $model->order?->recalculateTotals();
+        });
+        static::updated(function ($model) {
+            $model->order?->recalculateTotals();
         });
         static::deleted(function ($model) {
-            $model->order->recalculateTotals();
+            $model->order?->recalculateTotals();
         });
     }
 
@@ -44,5 +48,10 @@ class Payment extends Model
     public function customer(): BelongsTo
     {
         return $this->belongsTo(Customer::class);
+    }
+
+    public function cheque(): HasOne
+    {
+        return $this->hasOne(Cheque::class);
     }
 }

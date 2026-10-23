@@ -38,6 +38,11 @@ class Customer extends Model
         return $this->hasMany(Quotation::class);
     }
 
+    public function cheques(): HasMany
+    {
+        return $this->hasMany(Cheque::class);
+    }
+
     public function getTotalPaidAttribute(): float
     {
         return $this->payments()->sum('amount');

@@ -18,6 +18,7 @@ use App\Http\Controllers\ReportController;
 use App\Http\Controllers\CalendarController;
 use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\BankController;
+use App\Http\Controllers\ChequeController;
 
 // Public Auth Routes
 Route::get('login', [AuthController::class, 'showLoginForm'])->name('login');
@@ -64,6 +65,15 @@ Route::middleware('auth')->group(function () {
     Route::resource('payments', PaymentController::class);
     Route::get('payments/create/{orderId}', [PaymentController::class, 'createForOrder'])->name('payments.create-for-order');
 
+    // Cheques Management
+    Route::get('cheques', [ChequeController::class, 'index'])->name('cheques.index');
+    Route::post('cheques/store-in', [ChequeController::class, 'storeIn'])->name('cheques.store-in');
+    Route::post('cheques/store-out', [ChequeController::class, 'storeOut'])->name('cheques.store-out');
+    Route::post('cheques/{cheque}/deposit', [ChequeController::class, 'deposit'])->name('cheques.deposit');
+    Route::post('cheques/{cheque}/realize', [ChequeController::class, 'realize'])->name('cheques.realize');
+    Route::post('cheques/{cheque}/return', [ChequeController::class, 'returnCheque'])->name('cheques.return');
+    Route::delete('cheques/{cheque}', [ChequeController::class, 'destroy'])->name('cheques.destroy');
+
     // Quotations
     Route::resource('quotations', QuotationController::class);
     Route::get('quotations/{quotation}/print', [QuotationController::class, 'print'])->name('quotations.print');
@@ -83,6 +93,7 @@ Route::middleware('auth')->group(function () {
     Route::get('api/calendar/events', [CalendarController::class, 'getEvents'])->name('api.calendar.events');
 
     // Reports
+    Route::get('reports/cheques', [ReportController::class, 'chequesReport'])->name('reports.cheques');
     Route::get('reports/payments', [ReportController::class, 'paymentsReport'])->name('reports.payments');
     Route::get('reports/expenses', [ReportController::class, 'expensesReport'])->name('reports.expenses');
     Route::get('reports/transactions', [ReportController::class, 'transactionsReport'])->name('reports.transactions');

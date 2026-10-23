@@ -66,13 +66,30 @@ class Order extends Model
         return $this->hasMany(Expense::class);
     }
 
+    public function cheques(): HasMany
+    {
+        return $this->hasMany(Cheque::class);
+    }
+
     public function recalculateTotals(): void
     {
-        $servicesTotal = $this->services()->sum('total_price');
-        $chargesTotal = $this->otherCharges()->sum('amount');
+        $servicesTotal = (float) $this->services()->sum('total_price');
+        $chargesTotal = (float) $this->otherCharges()->sum('amount');
         $subTotal = $servicesTotal + $chargesTotal;
-        $totalAmount = $subTotal - $this->discount;
-        $paidAmount = $this->payments()->sum('amount');
+        if ($subTotal <= 0 && (float) $this->sub_total > 0) {
+            $subTotal = (float) $this->sub_total;
+        }
+
+        $totalAmount = $subTotal - (float) $this->discount;
+        if ($totalAmount <= 0 && (float) $this->total_amount > 0) {
+            $totalAmount = (float) $this->total_amount;
+        }
+
+        $paidAmount = (float) $this->payments()
+            ->where(function ($q) {
+                $q->whereNull('status')->orWhere('status', '!=', 'Returned');
+            })
+            ->sum('amount');
         $balance = $totalAmount - $paidAmount;
 
         $status = 'pending';

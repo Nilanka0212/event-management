@@ -30,4 +30,9 @@ class Bank extends Model
         $branch = $this->branch ? " - {$this->branch}" : "";
         return "{$this->bank_name} ({$this->account_number}){$branch}";
     }
+
+    public function cheques(): \Illuminate\Database\Eloquent\Relations\HasMany
+    {
+        return $this->hasMany(Cheque::class);
+    }
 }

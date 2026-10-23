@@ -9,6 +9,7 @@ use App\Models\Order;
 use App\Models\Customer;
 use App\Models\Bank;
 use App\Models\BankTransaction;
+use App\Models\Cheque;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -104,21 +105,60 @@ class ExpenseController extends Controller
         DB::transaction(function () use ($validated) {
             $expense = Expense::create($validated);
 
-            // Record in bank transactions ledger
-            BankTransaction::create([
-                'type' => 'expense',
-                'transaction_method' => $validated['payment_method'],
-                'account_type' => $validated['payment_method'] === 'cash' ? 'cash' : ($validated['bank_name'] ?? 'bank'),
-                'amount' => $validated['amount'],
-                'description' => ($validated['type'] === 'direct' ? 'Direct Event Expense: ' : 'Expense: ') . $validated['description'],
-                'reference_no' => $expense->expense_no,
-                'cheque_no' => $validated['cheque_no'] ?? null,
-                'bank_name' => $validated['bank_name'] ?? null,
-                'transaction_date' => $validated['expense_date'],
-            ]);
+            if ($validated['payment_method'] === 'cheque') {
+                // Cheque expense: record as Outward Cheque (Issued)
+                // Bank balance will NOT be deducted immediately.
+                // Balance is only deducted when cheque is marked as Realized / Cleared in Cheques Management!
+                $targetBank = null;
+                if (!empty($validated['bank_name'])) {
+                    $targetBank = Bank::where('bank_name', 'like', "%{$validated['bank_name']}%")->first();
+                }
+
+                $chequeNo = !empty($validated['cheque_no']) ? trim($validated['cheque_no']) : ('CHQ-' . str_pad($expense->id, 6, '0', STR_PAD_LEFT));
+
+                Cheque::create([
+                    'type' => 'OUT',
+                    'cheque_number' => $chequeNo,
+                    'cheque_date' => $validated['expense_date'],
+                    'received_or_issued_date' => $validated['expense_date'],
+                    'amount' => $validated['amount'],
+                    'payee_name' => $validated['description'],
+                    'expense_id' => $expense->id,
+                    'bank_id' => $targetBank?->id,
+                    'status' => 'Issued',
+                    'notes' => $validated['notes'] ?: "Cheque issued for {$validated['type']} expense: {$validated['description']}",
+                ]);
+            } else {
+                // Cash or Bank Transfer: record in bank transactions ledger
+                $accountType = $validated['payment_method'] === 'cash' ? 'cash' : ($validated['bank_name'] ?? 'bank');
+                $targetBank = null;
+                if ($validated['payment_method'] === 'bank_transfer' && !empty($validated['bank_name'])) {
+                    $targetBank = Bank::where('bank_name', 'like', "%{$validated['bank_name']}%")->first();
+                    if ($targetBank) {
+                        $targetBank->decrement('current_balance', $validated['amount']);
+                    }
+                }
+
+                BankTransaction::create([
+                    'type' => 'expense',
+                    'transaction_method' => $validated['payment_method'],
+                    'account_type' => $accountType,
+                    'amount' => $validated['amount'],
+                    'description' => ($validated['type'] === 'direct' ? 'Direct Event Expense: ' : 'Expense: ') . $validated['description'],
+                    'reference_no' => $expense->expense_no,
+                    'cheque_no' => null,
+                    'bank_name' => $validated['bank_name'] ?? null,
+                    'transaction_date' => $validated['expense_date'],
+                    'running_balance' => $targetBank?->current_balance ?? 0,
+                ]);
+            }
         });
 
-        return redirect()->route('expenses.index')->with('success', 'Expense recorded successfully and ledger updated.');
+        $successMsg = ($validated['payment_method'] === 'cheque')
+            ? 'Expense recorded and Cheque saved to Cheque Management (Issued).'
+            : 'Expense recorded successfully and ledger updated.';
+
+        return redirect()->route('expenses.index')->with('success', $successMsg);
     }
 
     /**

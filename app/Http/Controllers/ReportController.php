@@ -9,6 +9,7 @@ use App\Models\Customer;
 use App\Models\Event;
 use App\Models\Bank;
 use App\Models\BankTransaction;
+use App\Models\Cheque;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -325,6 +326,76 @@ class ReportController extends Controller
             'cashOutTotal',
             'bankInTotal',
             'bankOutTotal',
+            'banks'
+        ));
+    }
+
+    /**
+     * Cheques Audit & Clearance Ledger Report
+     */
+    public function chequesReport(Request $request)
+    {
+        $dateFrom = $request->get('date_from', Carbon::now()->startOfMonth()->format('Y-m-d'));
+        $dateTo = $request->get('date_to', Carbon::today()->format('Y-m-d'));
+        $type = $request->get('type', 'all');
+        $status = $request->get('status', 'all');
+        $bankId = $request->get('bank_id');
+        $search = $request->get('search');
+
+        $baseQuery = Cheque::with(['customer', 'order.event', 'bank', 'payment', 'expense'])
+            ->whereBetween('received_or_issued_date', [$dateFrom, $dateTo]);
+
+        // Totals across the period
+        $periodChequesCount = (clone $baseQuery)->count();
+        $inTotal = (float) (clone $baseQuery)->where('type', 'IN')->sum('amount');
+        $outTotal = (float) (clone $baseQuery)->where('type', 'OUT')->sum('amount');
+        $realizedTotal = (float) (clone $baseQuery)->where('status', 'Realized')->sum('amount');
+        $pendingTotal = (float) (clone $baseQuery)->whereIn('status', ['In Hand', 'Deposited', 'Issued'])->sum('amount');
+        $returnedTotal = (float) (clone $baseQuery)->where('status', 'Returned')->sum('amount');
+
+        // Filtered query for display
+        $query = (clone $baseQuery);
+
+        if ($type && in_array(strtoupper($type), ['IN', 'OUT'])) {
+            $query->where('type', strtoupper($type));
+        }
+
+        if ($status && $status !== 'all') {
+            $query->where('status', $status);
+        }
+
+        if ($bankId) {
+            $query->where('bank_id', $bankId);
+        }
+
+        if ($search) {
+            $query->where(function ($q) use ($search) {
+                $q->where('cheque_number', 'like', "%{$search}%")
+                  ->orWhere('payer_bank', 'like', "%{$search}%")
+                  ->orWhere('payee_name', 'like', "%{$search}%")
+                  ->orWhere('notes', 'like', "%{$search}%")
+                  ->orWhereHas('customer', fn($c) => $c->where('name', 'like', "%{$search}%"))
+                  ->orWhereHas('order', fn($o) => $o->where('order_no', 'like', "%{$search}%"));
+            });
+        }
+
+        $cheques = $query->orderBy('received_or_issued_date', 'desc')->orderBy('id', 'desc')->paginate(25)->withQueryString();
+        $banks = Bank::orderBy('bank_name')->get();
+
+        return view('reports.cheques', compact(
+            'cheques',
+            'dateFrom',
+            'dateTo',
+            'type',
+            'status',
+            'bankId',
+            'search',
+            'periodChequesCount',
+            'inTotal',
+            'outTotal',
+            'realizedTotal',
+            'pendingTotal',
+            'returnedTotal',
             'banks'
         ));
     }

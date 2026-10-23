@@ -1878,7 +1878,7 @@
 
             <!-- 3. Finance (Dropdown) -->
             @php
-                $isFinanceActive = request()->routeIs('payments.*') || request()->routeIs('expenses.*') || request()->routeIs('cash-book') || request()->routeIs('bank-book') || request()->routeIs('bank-transactions.*');
+                $isFinanceActive = request()->routeIs('payments.*') || request()->routeIs('cheques.*') || request()->routeIs('expenses.*') || request()->routeIs('cash-book') || request()->routeIs('bank-book') || request()->routeIs('bank-transactions.*');
             @endphp
             <div class="sidebar-dropdown">
                 <a href="#menuFinance" 
@@ -1896,6 +1896,10 @@
                         <a href="{{ route('payments.index') }}" class="sidebar-link {{ request()->routeIs('payments.*') ? 'active' : '' }}">
                             <i class="bi bi-cash-stack"></i>
                             <span>Payments</span>
+                        </a>
+                        <a href="{{ route('cheques.index') }}" class="sidebar-link {{ request()->routeIs('cheques.*') ? 'active' : '' }}">
+                            <i class="bi bi-card-heading"></i>
+                            <span>Cheque Management</span>
                         </a>
                         <a href="{{ route('expenses.index') }}" class="sidebar-link {{ request()->routeIs('expenses.*') ? 'active' : '' }}">
                             <i class="bi bi-credit-card-2-front"></i>
@@ -1937,6 +1941,10 @@
                         <a href="{{ route('reports.payments') }}" class="sidebar-link {{ request()->routeIs('reports.payments') ? 'active' : '' }}">
                             <i class="bi bi-receipt-cutoff"></i>
                             <span>Payments Report</span>
+                        </a>
+                        <a href="{{ route('reports.cheques') }}" class="sidebar-link {{ request()->routeIs('reports.cheques') ? 'active' : '' }}">
+                            <i class="bi bi-file-earmark-check"></i>
+                            <span>Cheques Report</span>
                         </a>
                         <a href="{{ route('reports.expenses') }}" class="sidebar-link {{ request()->routeIs('reports.expenses') ? 'active' : '' }}">
                             <i class="bi bi-wallet2"></i>
